@@ -49,11 +49,15 @@ jobs:
             | tee logs/test-output.log
         continue-on-error: true
 
-      - name: Run Failure Signature Analyzer (Java)
+      - name: Run Failure Signature Analyser (Java)
         if: always()
         run: |
-          mvn -q -DskipTests exec:java \
-            -Dexec.mainClass="com.example.failureSignatureAnalyser"
+          if [ -f logs/test-output.log ]; then
+            echo "🔍 Running failureSignatureAnalyser..."
+            mvn -q -DskipTests exec:java -Dexec.mainClass="com.example.failureSignatureAnalyser"
+          else
+            echo "❌ Log file not found, skipping failureSignatureAnalyser."
+          fi
 
       - name: Upload logs
         if: always()
