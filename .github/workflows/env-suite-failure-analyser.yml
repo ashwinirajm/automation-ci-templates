@@ -57,33 +57,11 @@ jobs:
         run: |
           if [ -f logs/test-output.log ]; then
             echo "🔍 Running failureSignatureAnalyser..."
-            # Run analyzer using compiled test classes
-            ANALYZER_OUTPUT=$(java -cp target/test-classes:target/classes com.example.failureSignatureAnalyser)
+            # Pass environment and suite as args for header
+            ANALYZER_OUTPUT=$(java -cp target/test-classes:target/classes com.example.failureSignatureAnalyser "${{ inputs.env }}" "${{ inputs.suite }}")
 
-            # ANSI color codes
-            RED='\033[0;31m'
-            GREEN='\033[0;32m'
-            YELLOW='\033[0;33m'
-            NC='\033[0m'
-
-            echo -e "${GREEN}========== FAILURE SUMMARY ==========${NC}"
-
-            # Color each failure type
-            echo "$ANALYZER_OUTPUT" | while IFS= read -r line; do
-              if [[ "$line" == *"TIMEOUT"* ]]; then
-                echo -e "${YELLOW}$line${NC}"
-              elif [[ "$line" == *"SERVER_500"* ]]; then
-                echo -e "${RED}$line${NC}"
-              elif [[ "$line" == *"ASSERTION_FAILURE"* ]]; then
-                echo -e "${RED}$line${NC}"
-              elif [[ "$line" == *"UNKNOWN_FAILURE"* ]]; then
-                echo -e "${RED}$line${NC}"
-              else
-                echo "$line"
-              fi
-            done
-
-            echo -e "${GREEN}====================================${NC}"
+            # Print the analyzer output as-is (colors are handled in Java)
+            echo "$ANALYZER_OUTPUT"
           else
             echo "❌ Log file not found, skipping failureSignatureAnalyser."
           fi
