@@ -4,7 +4,7 @@ import org.testng.annotations.Test;
 import java.util.Properties;
 import java.io.FileInputStream;
 
-public class SampleTest {
+public class sampleTest {
 
     @Test
     public void testEnvironment() throws Exception {
