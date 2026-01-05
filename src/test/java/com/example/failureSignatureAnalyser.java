@@ -5,11 +5,13 @@ import java.util.*;
 
 public class failureSignatureAnalyser {
 
-    // ANSI color codes for console
-    private static final String RED = "\033[0;31m";
-    private static final String GREEN = "\033[0;32m";
-    private static final String YELLOW = "\033[0;33m";
-    private static final String NC = "\033[0m"; // No Color
+    // ANSI color codes
+    private static final String BROWN = "\033[0;33m";    // Brown/orange for failures
+    private static final String YELLOW = "\033[1;33m";   // Light yellow for TIMEOUT
+    private static final String GREEN = "\033[0;32m";    // Passed
+    private static final String MAGENTA = "\033[0;35m";  // Unknown failure
+    private static final String CYAN = "\033[0;36m";     // Header
+    private static final String NC = "\033[0m";          // No Color
 
     public static void main(String[] args) throws Exception {
         File logFile = new File("logs/test-output.log");
@@ -18,7 +20,6 @@ public class failureSignatureAnalyser {
             return;
         }
 
-        // Counters for failure types
         Map<String, Integer> failureCounts = new LinkedHashMap<>();
         failureCounts.put("TIMEOUT", 0);
         failureCounts.put("SERVER_500", 0);
@@ -26,7 +27,6 @@ public class failureSignatureAnalyser {
         failureCounts.put("UNKNOWN_FAILURE", 0);
         int passedCount = 0;
 
-        // Messages for each type
         Map<String, List<String>> failureMessages = new LinkedHashMap<>();
         failureMessages.put("TIMEOUT", new ArrayList<>());
         failureMessages.put("SERVER_500", new ArrayList<>());
@@ -39,7 +39,6 @@ public class failureSignatureAnalyser {
         while ((line = br.readLine()) != null) {
             String lower = line.toLowerCase();
 
-            // Failures
             if (lower.contains("timeout")) {
                 failureCounts.put("TIMEOUT", failureCounts.get("TIMEOUT") + 1);
                 failureMessages.get("TIMEOUT").add(line);
@@ -52,35 +51,48 @@ public class failureSignatureAnalyser {
             } else if (lower.contains("exception") || lower.contains("failed")) {
                 failureCounts.put("UNKNOWN_FAILURE", failureCounts.get("UNKNOWN_FAILURE") + 1);
                 failureMessages.get("UNKNOWN_FAILURE").add(line);
-            } 
-            // Passed tests (Maven/TestNG lines)
-            else if (lower.contains("tests run") && lower.contains("success")) {
-                passedCount++;
-                passedMessages.add(line);
+            } else if (lower.contains("tests run") && lower.contains("failures: 0") && lower.contains("errors: 0")) {
+                int run = extractTestsRun(line);
+                passedCount += run;
+                passedMessages.add(line.trim());
             }
         }
         br.close();
 
-        // Print summary with colors
-        System.out.println("\n========== FAILURE SUMMARY ==========");
+        // Print summary
+        System.out.println("\n" + CYAN + "========== TEST SUMMARY ==========" + NC);
 
-        // Failures
         failureCounts.forEach((type, count) -> {
-            String color = (type.equals("TIMEOUT")) ? YELLOW : RED;
+            String color = switch (type) {
+                case "TIMEOUT" -> YELLOW;
+                case "SERVER_500", "ASSERTION_FAILURE" -> BROWN;
+                case "UNKNOWN_FAILURE" -> MAGENTA;
+                default -> NC;
+            };
             System.out.printf(color + "%-20s : %d occurrence(s)%s%n", type, count, NC);
             List<String> messages = failureMessages.get(type);
             if (!messages.isEmpty()) {
-                System.out.println("  Messages:");
                 messages.stream().distinct().forEach(msg -> System.out.println("    - " + msg));
             }
         });
 
-        // Passed tests
         if (passedCount > 0) {
             System.out.printf(GREEN + "PASSED              : %d occurrence(s)%s%n", passedCount, NC);
             passedMessages.stream().distinct().forEach(msg -> System.out.println(GREEN + "    - " + msg + NC));
         }
 
-        System.out.println("====================================\n");
+        System.out.println(CYAN + "====================================" + NC + "\n");
+    }
+
+    private static int extractTestsRun(String line) {
+        try {
+            int start = line.indexOf("tests run:");
+            if (start < 0) return 0;
+            String sub = line.substring(start + 10);
+            String[] parts = sub.split(",");
+            return Integer.parseInt(parts[0].trim());
+        } catch (Exception e) {
+            return 0;
+        }
     }
 }
