@@ -1,0 +1,91 @@
+name: Mobile Test Template
+
+env:
+  ENVIRONMENT: qa
+  THREAD_COUNT: 1
+
+# Triggers: manual + scheduled
+on:
+  workflow_dispatch:
+  schedule:
+    # Runs every Thursday at 14:30 UTC
+    - cron: '30 14 * * 4'
+
+jobs:
+  android_tests:
+    name: Android Tests
+    runs-on: [self-hosted, macos]
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set Android config
+        run: |
+          echo "PLATFORM=android" >> $GITHUB_ENV
+          echo "SUITE_XML=android_suite.xml" >> $GITHUB_ENV
+
+      - name: Find latest APK
+        run: |
+          apk=$(ls -t /opt/builds/android/*.apk | head -n 1)
+          if [ -z "$apk" ]; then
+            echo "APK not found"
+            exit 1
+          fi
+          echo "APP_PATH=$apk" >> $GITHUB_ENV
+
+      - name: Run Android tests
+        run: |
+          mvn clean test \
+            -Denvironment=${{ env.ENVIRONMENT }} \
+            -Dplatform=${{ env.PLATFORM }} \
+            -DsuiteXmlFiles=${{ env.SUITE_XML }} \
+            -DthreadCount=${{ env.THREAD_COUNT }}
+
+      - name: Upload Android reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-reports
+          path: reports/
+
+  ios_tests:
+    name: iOS Tests
+    needs: android_tests
+    if: always()
+    runs-on: [self-hosted, macos]
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set iOS config
+        run: |
+          echo "PLATFORM=ios" >> $GITHUB_ENV
+          echo "SUITE_XML=ios_suite.xml" >> $GITHUB_ENV
+
+      - name: Find latest iOS app
+        run: |
+          app=$(ls -dt /opt/builds/ios/*.app | head -n 1)
+          if [ -z "$app" ]; then
+            echo "iOS app not found"
+            exit 1
+          fi
+          echo "APP_PATH=$app" >> $GITHUB_ENV
+
+      - name: Run iOS tests
+        run: |
+          mvn clean test \
+            -Denvironment=${{ env.ENVIRONMENT }} \
+            -Dplatform=${{ env.PLATFORM }} \
+            -DsuiteXmlFiles=${{ env.SUITE_XML }} \
+            -DthreadCount=${{ env.THREAD_COUNT }}
+
+      - name: Upload iOS reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-reports
+          path: reports/
