@@ -1,0 +1,54 @@
+name: Environment Based Tests
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: "Target environment"
+        required: true
+        default: "qa"
+        type: choice
+        options:
+          - qa
+          - staging
+          - prod
+      suite:
+        description: "Test suite to run"
+        required: true
+        default: "smoke"
+        type: choice
+        options:
+          - smoke
+          - regression
+
+jobs:
+  run-tests:
+    runs-on: ubuntu-latest
+
+    env:
+      ENV: ${{ github.event.inputs.environment }}
+      SUITE: ${{ github.event.inputs.suite }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Run tests
+        run: |
+          echo "Running $SUITE tests on $ENV environment"
+          mvn clean test \
+            -Denv=$ENV \
+            -Dsuite=$SUITE
+
+      - name: Upload report (on failure)
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-report
+          path: target/surefire-reports
