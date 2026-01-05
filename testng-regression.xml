@@ -2,7 +2,7 @@
 <suite name="RegressionSuite">
   <test name="RegressionTests">
     <classes>
-      <class name="com.example.SampleTest"/>
+      <class name="com.example.sampleTest"/>
     </classes>
   </test>
 </suite>
