@@ -3,7 +3,7 @@ package com.example;
 import java.io.*;
 import java.util.*;
 
-public class failureSignatureAnalyzer {
+public class failureSignatureAnalyser {
 
     public static void main(String[] args) throws Exception {
 
