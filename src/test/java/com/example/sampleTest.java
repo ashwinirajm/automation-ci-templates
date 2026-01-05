@@ -5,14 +5,19 @@ import java.util.Properties;
 import java.io.FileInputStream;
 
 public class sampleTest {
-
+    
     @Test
-    public void testEnvironment() throws Exception {
+    public void sampleTest() {
         String env = System.getProperty("env", "qa");
-        Properties props = new Properties();
-        props.load(new FileInputStream("src/test/resources/" + env + ".properties"));
-        System.out.println("Running test in environment: " + env);
-        System.out.println("Base URL: " + props.getProperty("base.url"));
+        String suite = System.getProperty("suite", "smoke");
+
+        System.out.println("=================================");
+        System.out.println("Executing Suite : " + suite);
+        System.out.println("Executing Env   : " + env);
+        System.out.println("=================================");
+
+        // Intentional failure for demo
+        Assert.assertEquals(1, 2, "Assertion failure demo");
     }
 }
 
