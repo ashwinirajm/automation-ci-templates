@@ -3,6 +3,7 @@ package com.example;
 import org.testng.annotations.Test;
 import java.util.Properties;
 import java.io.FileInputStream;
+import org.testng.Assert;
 
 public class sampleTest {
     
