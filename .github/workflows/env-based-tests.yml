@@ -44,12 +44,24 @@ jobs:
 
       - name: Run tests
         run: |
-          if [ "$SUITE" = "smoke" ]; then
-            mvn clean test -Dsurefire.suiteXmlFiles=testng-smoke.xml -Denv=$ENV
-          else
-            mvn clean test -Dsurefire.suiteXmlFiles=testng-regression.xml -Denv=$ENV
-          fi
+              if [ "$SUITE" = "smoke" ]; then
+              mvn clean test \
+              -Dsurefire.suiteXmlFiles=testng-smoke.xml \
+              -Denv=$ENV \
+              -Dsuite=smoke
+              else
+              mvn clean test \
+              -Dsurefire.suiteXmlFiles=testng-regression.xml \
+              -Denv=$ENV \
+              -Dsuite=regression
+              fi
 
+      - name: Analyze failure signatures
+        if: failure()
+        run: |
+          mvn -q -DskipTests exec:java \
+            -Dexec.mainClass="com.example.FailureSignatureAnalyzer"
+            
       - name: Upload report (on failure)
         if: failure()
         uses: actions/upload-artifact@v4
