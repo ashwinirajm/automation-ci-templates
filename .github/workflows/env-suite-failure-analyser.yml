@@ -1,0 +1,74 @@
+name: Env + Suite Tests with Failure Signature Analysis
+
+on:
+  workflow_dispatch:
+    inputs:
+      env:
+        description: "Environment"
+        required: true
+        default: "qa"
+        type: choice
+        options:
+          - qa
+          - prod
+      suite:
+        description: "Test Suite"
+        required: true
+        default: "smoke"
+        type: choice
+        options:
+          - smoke
+          - regression
+
+jobs:
+  test-and-analyse:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Run tests
+        id: run_tests
+        run: |
+          mkdir -p logs
+          mvn test \
+            -Denv=${{ inputs.env }} \
+            -Dsuite=${{ inputs.suite }} \
+            -DsuiteFile=src/test/resources/suites/${{ inputs.suite }}.xml \
+            | tee logs/test-output.log
+        continue-on-error: true
+
+      - name: Failure Signature Analysis (REAL TIME)
+        if: always()
+        run: |
+          echo "🔍 Analysing failures..."
+
+          if grep -qi "timeout" logs/test-output.log; then
+            CATEGORY="TIMEOUT"
+          elif grep -qi "500" logs/test-output.log; then
+            CATEGORY="SERVER_500"
+          elif grep -qi "assert" logs/test-output.log; then
+            CATEGORY="ASSERTION_FAILURE"
+          else
+            CATEGORY="UNKNOWN_FAILURE"
+          fi
+
+          echo "================================="
+          echo "❌ FAILURE CATEGORY : $CATEGORY"
+          echo "🌍 ENV              : ${{ inputs.env }}"
+          echo "🧪 SUITE            : ${{ inputs.suite }}"
+          echo "================================="
+
+      - name: Upload logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-logs
+          path: logs/test-output.log
