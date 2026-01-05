@@ -53,7 +53,7 @@ jobs:
         if: always()
         run: |
           mvn -q -DskipTests exec:java \
-            -Dexec.mainClass="com.example.FailureSignatureAnalyzer"
+            -Dexec.mainClass="com.example.failureSignatureAnalyser"
 
       - name: Upload logs
         if: always()
