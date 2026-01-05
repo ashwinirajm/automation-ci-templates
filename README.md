@@ -10,6 +10,6 @@
 # automation-ci-templates
 Reusable GitHub Actions CI templates for test automation.
 
-![Scheduled Tests](https://github.com/<your-username>/automation-ci-templates/actions/workflows/scheduled_mobile_test/badge.svg)
+![Scheduled Tests](https://github.com/<your-username>/automation-ci-templates/actions/workflows/scheduled-mobile-tests/badge.svg)
 
 
