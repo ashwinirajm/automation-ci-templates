@@ -14,12 +14,18 @@ public class failureSignatureAnalyser {
     private static final String NC = "\033[0m";          // No Color
 
     public static void main(String[] args) throws Exception {
+
+        // Parse environment and suite from arguments
+        String env = args.length > 0 ? args[0] : "UNKNOWN_ENV";
+        String suite = args.length > 1 ? args[1] : "UNKNOWN_SUITE";
+
         File logFile = new File("logs/test-output.log");
         if (!logFile.exists()) {
             System.out.println("❌ Log file not found: " + logFile.getAbsolutePath());
             return;
         }
 
+        // Counters for failure types
         Map<String, Integer> failureCounts = new LinkedHashMap<>();
         failureCounts.put("TIMEOUT", 0);
         failureCounts.put("SERVER_500", 0);
@@ -27,6 +33,7 @@ public class failureSignatureAnalyser {
         failureCounts.put("UNKNOWN_FAILURE", 0);
         int passedCount = 0;
 
+        // Messages for each type
         Map<String, List<String>> failureMessages = new LinkedHashMap<>();
         failureMessages.put("TIMEOUT", new ArrayList<>());
         failureMessages.put("SERVER_500", new ArrayList<>());
@@ -39,6 +46,7 @@ public class failureSignatureAnalyser {
         while ((line = br.readLine()) != null) {
             String lower = line.toLowerCase();
 
+            // Failures
             if (lower.contains("timeout")) {
                 failureCounts.put("TIMEOUT", failureCounts.get("TIMEOUT") + 1);
                 failureMessages.get("TIMEOUT").add(line);
@@ -51,7 +59,9 @@ public class failureSignatureAnalyser {
             } else if (lower.contains("exception") || lower.contains("failed")) {
                 failureCounts.put("UNKNOWN_FAILURE", failureCounts.get("UNKNOWN_FAILURE") + 1);
                 failureMessages.get("UNKNOWN_FAILURE").add(line);
-            } else if (lower.contains("tests run") && lower.contains("failures: 0") && lower.contains("errors: 0")) {
+            } 
+            // Passed tests (parse Maven/TestNG summary)
+            else if (lower.contains("tests run") && lower.contains("failures: 0") && lower.contains("errors: 0")) {
                 int run = extractTestsRun(line);
                 passedCount += run;
                 passedMessages.add(line.trim());
@@ -59,9 +69,10 @@ public class failureSignatureAnalyser {
         }
         br.close();
 
-        // Print summary
-        System.out.println("\n" + CYAN + "========== TEST SUMMARY ==========" + NC);
+        // Print summary header
+        System.out.println("\n" + CYAN + "========== TEST SUMMARY [" + env.toUpperCase() + " | " + suite.toUpperCase() + "] ==========" + NC);
 
+        // Print failures
         failureCounts.forEach((type, count) -> {
             String color = switch (type) {
                 case "TIMEOUT" -> YELLOW;
@@ -76,17 +87,23 @@ public class failureSignatureAnalyser {
             }
         });
 
+        // Print passed tests
         if (passedCount > 0) {
             System.out.printf(GREEN + "PASSED              : %d occurrence(s)%s%n", passedCount, NC);
             passedMessages.stream().distinct().forEach(msg -> System.out.println(GREEN + "    - " + msg + NC));
         }
 
+        // Footer
         System.out.println(CYAN + "====================================" + NC + "\n");
     }
 
+    /**
+     * Extracts the number of tests run from a Maven/TestNG summary line.
+     * Example line: [INFO] Tests run: 3, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.123 s
+     */
     private static int extractTestsRun(String line) {
         try {
-            int start = line.indexOf("tests run:");
+            int start = line.toLowerCase().indexOf("tests run:");
             if (start < 0) return 0;
             String sub = line.substring(start + 10);
             String[] parts = sub.split(",");
