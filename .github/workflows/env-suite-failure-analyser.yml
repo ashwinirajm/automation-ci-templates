@@ -38,6 +38,10 @@ jobs:
         id: run_tests
         run: |
           mkdir -p logs
+          echo "================================="
+          echo "Executing Suite : ${{ inputs.suite }}"
+          echo "Executing Env   : ${{ inputs.env }}"
+          echo "================================="
           mvn test \
             -Denv=${{ inputs.env }} \
             -Dsuite=${{ inputs.suite }} \
@@ -45,26 +49,11 @@ jobs:
             | tee logs/test-output.log
         continue-on-error: true
 
-      - name: Failure Signature Analysis (REAL TIME)
+      - name: Run Failure Signature Analyzer (Java)
         if: always()
         run: |
-          echo "🔍 Analysing failures..."
-
-          if grep -qi "timeout" logs/test-output.log; then
-            CATEGORY="TIMEOUT"
-          elif grep -qi "500" logs/test-output.log; then
-            CATEGORY="SERVER_500"
-          elif grep -qi "assert" logs/test-output.log; then
-            CATEGORY="ASSERTION_FAILURE"
-          else
-            CATEGORY="UNKNOWN_FAILURE"
-          fi
-
-          echo "================================="
-          echo "❌ FAILURE CATEGORY : $CATEGORY"
-          echo "🌍 ENV              : ${{ inputs.env }}"
-          echo "🧪 SUITE            : ${{ inputs.suite }}"
-          echo "================================="
+          mvn -q -DskipTests exec:java \
+            -Dexec.mainClass="com.example.FailureSignatureAnalyzer"
 
       - name: Upload logs
         if: always()
