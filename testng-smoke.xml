@@ -2,7 +2,7 @@
 <suite name="SmokeSuite">
   <test name="SmokeTests">
     <classes>
-      <class name="com.example.SampleTest"/>
+      <class name="com.example.sampleTest"/>
     </classes>
   </test>
 </suite>
