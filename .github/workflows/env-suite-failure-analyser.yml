@@ -49,12 +49,38 @@ jobs:
             | tee logs/test-output.log
         continue-on-error: true
 
-      - name: Run Failure Signature Analyser (Java)
+      - name: Run Failure Signature Analyser (Colored Output)
         if: always()
         run: |
           if [ -f logs/test-output.log ]; then
             echo "🔍 Running failureSignatureAnalyser..."
-            mvn -q -DskipTests exec:java -Dexec.mainClass="com.example.failureSignatureAnalyser"
+            # Capture analyzer output
+            ANALYZER_OUTPUT=$(mvn -q -DskipTests exec:java -Dexec.mainClass="com.example.failureSignatureAnalyser")
+            
+            # Color codes
+            RED='\033[0;31m'
+            GREEN='\033[0;32m'
+            YELLOW='\033[0;33m'
+            NC='\033[0m' # No Color
+            
+            echo -e "${GREEN}========== FAILURE SUMMARY ==========${NC}"
+            
+            # Color each failure type
+            echo "$ANALYZER_OUTPUT" | while IFS= read -r line; do
+              if [[ "$line" == *"TIMEOUT"* ]]; then
+                echo -e "${YELLOW}$line${NC}"
+              elif [[ "$line" == *"SERVER_500"* ]]; then
+                echo -e "${RED}$line${NC}"
+              elif [[ "$line" == *"ASSERTION_FAILURE"* ]]; then
+                echo -e "${RED}$line${NC}"
+              elif [[ "$line" == *"UNKNOWN_FAILURE"* ]]; then
+                echo -e "${RED}$line${NC}"
+              else
+                echo "$line"
+              fi
+            done
+            
+            echo -e "${GREEN}====================================${NC}"
           else
             echo "❌ Log file not found, skipping failureSignatureAnalyser."
           fi
