@@ -10,7 +10,6 @@ on:
         type: choice
         options:
           - qa
-          - staging
           - prod
       suite:
         description: "Test suite to run"
@@ -39,12 +38,17 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
 
-      - name: Run tests
+      - name: Print context
         run: |
           echo "Running $SUITE tests on $ENV environment"
-          mvn clean test \
-            -Denv=$ENV \
-            -Dsuite=$SUITE
+
+      - name: Run tests
+        run: |
+          if [ "$SUITE" = "smoke" ]; then
+            mvn clean test -Dsurefire.suiteXmlFiles=testng-smoke.xml -Denv=$ENV
+          else
+            mvn clean test -Dsurefire.suiteXmlFiles=testng-regression.xml -Denv=$ENV
+          fi
 
       - name: Upload report (on failure)
         if: failure()
