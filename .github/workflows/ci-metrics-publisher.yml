@@ -35,6 +35,13 @@ jobs:
       - name: Run Appium TestNG tests
         run: mvn test || true
 
+      - name: List surefire-reports
+        run: |
+          echo "Listing surefire-reports directory..."
+          ls -l target/surefire-reports/
+          echo "Printing testng-results.xml..."
+          cat target/surefire-reports/testng-results.xml || echo "No XML found"
+
       # 5️⃣ Generate CI metrics (single step)
       - name: Generate CI metrics
         run: bash scripts/generate-ci-metrics.sh
