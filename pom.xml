@@ -13,6 +13,8 @@
     <maven.compiler.source>17</maven.compiler.source>
     <maven.compiler.target>17</maven.compiler.target>
     <suiteFile>src/test/resources/suites/smoke.xml</suiteFile>
+    <!-- New property for CI Metrics workflow -->
+    <ciSuiteFile>src/test/resources/suites/ci-metrics.xml</ciSuiteFile>
   </properties>
 
   <dependencies>
@@ -31,15 +33,19 @@
         <artifactId>maven-surefire-plugin</artifactId>
         <version>3.2.5</version>
         <configuration>
+          <!-- Default suite (your existing smoke tests) -->
           <suiteXmlFiles>
             <suiteXmlFile>${suiteFile}</suiteXmlFile>
           </suiteXmlFiles>
-                 
-         <!-- Ensure TestNG report goes to target/surefire-reports -->
-         <reportsDirectory>${project.build.directory}/surefire-reports</reportsDirectory>
-         <testFailureIgnore>true</testFailureIgnore>
-         <useFile>true</useFile> <!-- Ensure XML file is created even if tests fail -->
-                 
+
+          <!-- Ensure reports are generated for CI metrics -->
+          <reportsDirectory>${project.build.directory}/surefire-reports</reportsDirectory>
+
+          <!-- Do not fail Maven build on test failures -->
+          <testFailureIgnore>true</testFailureIgnore>
+
+          <!-- Ensure XML always generated, even on runtime exceptions -->
+          <useFile>true</useFile>
         </configuration>
       </plugin>
     </plugins>
