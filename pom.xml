@@ -36,6 +36,7 @@
           <!-- Default suite (your existing smoke tests) -->
           <suiteXmlFiles>
             <suiteXmlFile>${suiteFile}</suiteXmlFile>
+            <suiteXmlFile>${ciSuiteFile}</suiteXmlFile>
           </suiteXmlFiles>
 
           <!-- Ensure reports are generated for CI metrics -->
