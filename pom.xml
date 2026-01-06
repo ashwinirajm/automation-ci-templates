@@ -34,6 +34,10 @@
           <suiteXmlFiles>
             <suiteXmlFile>${suiteFile}</suiteXmlFile>
           </suiteXmlFiles>
+                 
+         <!-- Ensure TestNG report goes to target/surefire-reports -->
+         <reportsDirectory>${project.build.directory}/surefire-reports</reportsDirectory>
+                 
         </configuration>
       </plugin>
     </plugins>
