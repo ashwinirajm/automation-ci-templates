@@ -11,18 +11,15 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # 1️⃣ Checkout repo
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # 2️⃣ Set up Java
       - name: Set up Java
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: 17
 
-      # 3️⃣ Optional: cache Maven dependencies
       - name: Cache Maven packages
         uses: actions/cache@v4
         with:
@@ -31,9 +28,8 @@ jobs:
           restore-keys: |
             maven-${{ runner.os }}-
 
-      # 4️⃣ Run Appium TestNG tests
-      - name: Run Appium TestNG tests
-        run: mvn test || true
+      - name: Run CI Metrics TestNG suite
+        run: mvn test -DsuiteFile=src/test/resources/suites/ci-metrics.xml
 
       - name: List surefire-reports
         run: |
@@ -42,11 +38,9 @@ jobs:
           echo "Printing testng-results.xml..."
           cat target/surefire-reports/testng-results.xml || echo "No XML found"
 
-      # 5️⃣ Generate CI metrics (single step)
       - name: Generate CI metrics
         run: bash scripts/generate-ci-metrics.sh
 
-      # 6️⃣ Publish metrics to GitHub summary
       - name: Publish metrics to summary
         run: |
           echo "## 📊 Appium CI Metrics" >> $GITHUB_STEP_SUMMARY
@@ -59,7 +53,6 @@ jobs:
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "Commit: \`${GITHUB_SHA}\`" >> $GITHUB_STEP_SUMMARY
 
-      # 7️⃣ Upload metrics artifact
       - name: Upload CI metrics artifact
         uses: actions/upload-artifact@v4
         with:
