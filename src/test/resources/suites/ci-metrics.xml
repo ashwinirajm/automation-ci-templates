@@ -1,0 +1,8 @@
+<!DOCTYPE suite SYSTEM "https://testng.org/testng-1.0.dtd">
+<suite name="CI Metrics Suite">
+    <test name="CIMetricsTests">
+        <classes>
+            <class name="com.example.CIMetricsTest"/>
+        </classes>
+    </test>
+</suite>
