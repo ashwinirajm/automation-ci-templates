@@ -1,4 +1,4 @@
-name: Test & Build Metrics Publisher
+name: Appium CI Metrics Publisher
 
 on:
   workflow_dispatch:
@@ -7,46 +7,84 @@ on:
 
 jobs:
   publish-metrics:
+    name: Publish Appium CI Metrics
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout code
+      - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Run tests
-        run: |
-          echo "Running tests..."
-          # replace with actual test command
-          sleep 5
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
 
-      - name: Generate test metrics
+      # Optional: cache Maven dependencies
+      - name: Cache Maven packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.m2
+          key: maven-${{ runner.os }}-${{ hashFiles('**/pom.xml') }}
+          restore-keys: |
+            maven-${{ runner.os }}-
+
+      - name: Run Appium TestNG tests
         run: |
+          mvn test || true
+
+      - name: Generate CI metrics
+        run: |
+          REPORT="target/surefire-reports/testng-results.xml"
+
+          if [ ! -f "$REPORT" ]; then
+            echo "TestNG report not found. Exiting."
+            exit 1
+          fi
+
+          TOTAL=$(grep -o 'tests="[0-9]*"' $REPORT | grep -o '[0-9]*')
+          FAILED=$(grep -o 'failures="[0-9]*"' $REPORT | grep -o '[0-9]*')
+          SKIPPED=$(grep -o 'skipped="[0-9]*"' $REPORT | grep -o '[0-9]*')
+          PASSED=$((TOTAL - FAILED - SKIPPED))
+
+          PASS_PERCENTAGE=$(awk "BEGIN {printf \"%.1f\", ($PASSED/$TOTAL)*100}")
+
           mkdir -p metrics
-          cat <<EOF > metrics/metrics.json
+
+          cat <<EOF > metrics/ci-metrics.json
           {
-            "total_tests": 120,
-            "passed": 110,
-            "failed": 8,
-            "skipped": 2,
-            "pass_percentage": 91.6,
-            "execution_time_seconds": 742,
+            "framework": "Appium + TestNG",
+            "total_tests": $TOTAL,
+            "passed": $PASSED,
+            "failed": $FAILED,
+            "skipped": $SKIPPED,
+            "pass_percentage": $PASS_PERCENTAGE,
             "commit_sha": "${GITHUB_SHA}",
             "workflow_run_id": "${GITHUB_RUN_ID}",
             "timestamp": "$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
           }
           EOF
 
-      - name: Publish metrics to summary
-        run: |
-          echo "## 📊 Test & Build Metrics" >> $GITHUB_STEP_SUMMARY
-          echo "- Total Tests: 120" >> $GITHUB_STEP_SUMMARY
-          echo "- Passed: 110" >> $GITHUB_STEP_SUMMARY
-          echo "- Failed: 8" >> $GITHUB_STEP_SUMMARY
-          echo "- Pass %: 91.6%" >> $GITHUB_STEP_SUMMARY
-          echo "- Execution Time: 742s" >> $GITHUB_STEP_SUMMARY
+          echo "TOTAL_TESTS=$TOTAL" >> $GITHUB_ENV
+          echo "PASSED=$PASSED" >> $GITHUB_ENV
+          echo "FAILED=$FAILED" >> $GITHUB_ENV
+          echo "SKIPPED=$SKIPPED" >> $GITHUB_ENV
+          echo "PASS_PERCENTAGE=$PASS_PERCENTAGE" >> $GITHUB_ENV
 
-      - name: Upload metrics artifact
+      - name: Publish metrics to GitHub summary
+        run: |
+          echo "## 📊 Appium CI Metrics" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **Total Tests:** $TOTAL_TESTS" >> $GITHUB_STEP_SUMMARY
+          echo "- **Passed:** $PASSED" >> $GITHUB_STEP_SUMMARY
+          echo "- **Failed:** $FAILED" >> $GITHUB_STEP_SUMMARY
+          echo "- **Skipped:** $SKIPPED" >> $GITHUB_STEP_SUMMARY
+          echo "- **Pass Percentage:** $PASS_PERCENTAGE%" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Commit: \`${GITHUB_SHA}\`" >> $GITHUB_STEP_SUMMARY
+
+      - name: Upload CI metrics artifact
         uses: actions/upload-artifact@v4
         with:
-          name: test-metrics
-          path: metrics/metrics.json
+          name: appium-ci-metrics
+          path: metrics/ci-metrics.json
