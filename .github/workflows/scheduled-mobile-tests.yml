@@ -1,10 +1,10 @@
-name: Mobile Test Template
+name: Mobile Automation – Android & iOS
 
 env:
   ENVIRONMENT: qa
   THREAD_COUNT: 1
 
-# Triggers: manual + scheduled
+# Triggers: manual + scheduled (weekly)
 on:
   workflow_dispatch:
   schedule:
@@ -21,19 +21,22 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Set Android config
+      # Set platform-specific environment variables
+      - name: Configure Android test parameters
         run: |
           echo "PLATFORM=android" >> $GITHUB_ENV
           echo "SUITE_XML=android_suite.xml" >> $GITHUB_ENV
 
-      - name: Find latest APK
+      # Locate latest Android build artifact
+      # (Replace this path with your actual build location)
+      - name: Locate Android app
         run: |
-          apk=$(ls -t /opt/builds/android/*.apk | head -n 1)
-          if [ -z "$apk" ]; then
-            echo "APK not found"
+          app=$(ls -t ./builds/android/*.apk | head -n 1)
+          if [ -z "$app" ]; then
+            echo "Android app not found"
             exit 1
           fi
-          echo "APP_PATH=$apk" >> $GITHUB_ENV
+          echo "APP_PATH=$app" >> $GITHUB_ENV
 
       - name: Run Android tests
         run: |
@@ -47,13 +50,11 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: android-reports
+          name: android-test-reports
           path: reports/
 
   ios_tests:
     name: iOS Tests
-    needs: android_tests
-    if: always()
     runs-on: [self-hosted, macos]
     timeout-minutes: 30
 
@@ -61,14 +62,17 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Set iOS config
+      # Set platform-specific environment variables
+      - name: Configure iOS test parameters
         run: |
           echo "PLATFORM=ios" >> $GITHUB_ENV
           echo "SUITE_XML=ios_suite.xml" >> $GITHUB_ENV
 
-      - name: Find latest iOS app
+      # Locate latest iOS build artifact
+      # (Replace this path with your actual build location)
+      - name: Locate iOS app
         run: |
-          app=$(ls -dt /opt/builds/ios/*.app | head -n 1)
+          app=$(ls -dt ./builds/ios/*.app | head -n 1)
           if [ -z "$app" ]; then
             echo "iOS app not found"
             exit 1
@@ -87,5 +91,5 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: ios-reports
+          name: ios-test-reports
           path: reports/
