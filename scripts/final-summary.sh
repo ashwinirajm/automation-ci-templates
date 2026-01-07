@@ -1,7 +1,7 @@
 #!/bin/bash
 set -e
 
-# Ensure this script is executable (works if accidentally checked in non-executable)
+# Make sure script is executable
 chmod +x "$0" || true
 
 RESULTS="target/surefire-reports/testng-results.xml"
@@ -15,33 +15,57 @@ echo "" >> "$SUMMARY_FILE"
 TABLE="| Test | Initial Result | Retryable | Rerun Result |\n"
 TABLE="$TABLE|------|----------------|-----------|--------------|\n"
 
-# Read failed lines safely
+# Check if test results exist
+if [ ! -f "$RESULTS" ]; then
+  TABLE="${TABLE}| No test results found | N/A | N/A | N/A |\n"
+  echo -e "$TABLE" >> "$SUMMARY_FILE"
+  echo "⚠️ TestNG results not found: $RESULTS" >> "$SUMMARY_FILE"
+  exit 1
+fi
+
+# Capture all failed tests (both TestNG <test-method> and <testcase> failures)
 FAILED_LINES=()
-while IFS= read -r line; do
-  FAILED_LINES+=("$line")
-done < <(grep '<test-method status="FAIL"' "$RESULTS" || true)
+mapfile -t FAILED_LINES < <(
+  grep -E '<test-method status="FAIL"|<testcase.*failure' "$RESULTS" || true
+)
 
-for line in "${FAILED_LINES[@]}"; do
-  CLASS=$(echo "$line" | sed -n 's/.*class="\([^"]*\)".*/\1/p')
-  METHOD=$(echo "$line" | sed -n 's/.*name="\([^"]*\)".*/\1/p')
-  MESSAGE=$(echo "$line" | sed -n 's/.*>\(.*\)<\/exception>.*/\1/p')
-
-  if echo "$MESSAGE" | grep -Ei "timeout|HTTP 500|500 Internal Server Error" > /dev/null; then
-    RETRY="Yes"
-    if [ -f "$RETRY_FAILED" ] && grep -q "$METHOD" "$RETRY_FAILED"; then
-      RERUN_RESULT="Fail"
-    else
-      RERUN_RESULT="Pass"
+# If no failed tests
+if [ ${#FAILED_LINES[@]} -eq 0 ]; then
+  TABLE="${TABLE}| All tests passed | Pass | N/A | N/A |\n"
+else
+  for line in "${FAILED_LINES[@]}"; do
+    # Extract class and method names
+    CLASS=$(echo "$line" | sed -n 's/.*class="\([^"]*\)".*/\1/p')
+    METHOD=$(echo "$line" | sed -n 's/.*name="\([^"]*\)".*/\1/p')
+    # fallback for <testcase classname="">
+    if [ -z "$CLASS" ]; then
+      CLASS=$(echo "$line" | sed -n 's/.*classname="\([^"]*\)".*/\1/p')
     fi
-  else
-    RETRY="No"
-    RERUN_RESULT="N/A"
-  fi
+    if [ -z "$METHOD" ]; then
+      METHOD=$(echo "$line" | sed -n 's/.*name="\([^"]*\)".*/\1/p')
+    fi
+    # Extract exception message if present
+    MESSAGE=$(echo "$line" | sed -n 's/.*>\(.*\)<\/exception>.*/\1/p')
 
-  TABLE="${TABLE}| ${CLASS}.${METHOD} | Fail | ${RETRY} | ${RERUN_RESULT} |\n"
-done
+    # Determine if retryable (Timeout / HTTP 500)
+    if echo "$MESSAGE" | grep -Ei "timeout|HTTP 500|500 Internal Server Error" > /dev/null; then
+      RETRY="Yes"
+      # Check if it still failed after rerun
+      if [ -f "$RETRY_FAILED" ] && grep -q "$METHOD" "$RETRY_FAILED"; then
+        RERUN_RESULT="Fail"
+      else
+        RERUN_RESULT="Pass"
+      fi
+    else
+      RETRY="No"
+      RERUN_RESULT="N/A"
+    fi
 
-# Append table to summary
+    TABLE="${TABLE}| ${CLASS}.${METHOD} | Fail | ${RETRY} | ${RERUN_RESULT} |\n"
+  done
+fi
+
+# Append the table to GitHub Actions summary
 echo -e "$TABLE" >> "$SUMMARY_FILE"
 
 # Overall verdict
