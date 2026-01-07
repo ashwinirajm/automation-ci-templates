@@ -1,4 +1,4 @@
-name: Smart Rerun – Timeout & 500 Only (SampleTest)
+name: Rerun Common Failures
 
 on:
   workflow_dispatch:
@@ -10,58 +10,47 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-     
-      - uses: actions/checkout@v4
+      # 1️⃣ Checkout
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-  
-      - uses: actions/setup-java@v4
+      # 2️⃣ Java setup
+      - name: Set up Java
+        uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: 17
 
-      # Run initial tests
+      # 3️⃣ Run initial tests
       - name: Run tests (initial)
+        id: initial
         run: mvn test -Denv=qa -Dsuite=smoke
         continue-on-error: true
 
-      # Analyze failures (based on your test messages)
-      - name: Analyze failures & build retry suite
+      # 4️⃣ Analyze failures & build retry suite
+      - name: Analyze failures
         id: analyse
         run: |
           RESULTS="test-output/testng-results.xml"
           RETRY_SUITE="test-output/retry-suite.xml"
-
-          echo "### 🧪 Failure Analysis (SampleTest)" >> $GITHUB_STEP_SUMMARY
-
-          if [ ! -f "$RESULTS" ]; then
-            echo "✅ No failures detected" >> $GITHUB_STEP_SUMMARY
-            echo "retry=false" >> $GITHUB_OUTPUT
-            exit 0
-          fi
 
           echo "<suite name=\"Retry Suite\">" > $RETRY_SUITE
           echo "  <test name=\"Retry Timeout & 500\">" >> $RETRY_SUITE
           echo "    <classes>" >> $RETRY_SUITE
 
           RETRY_COUNT=0
-
           grep '<test-method status="FAIL"' $RESULTS | while read -r line; do
             CLASS=$(echo "$line" | sed -n 's/.*class="\([^"]*\)".*/\1/p')
             METHOD=$(echo "$line" | sed -n 's/.*name="\([^"]*\)".*/\1/p')
             MESSAGE=$(echo "$line" | sed -n 's/.*>\(.*\)<\/exception>.*/\1/p')
 
-            if echo "$MESSAGE" | grep -Ei "timeout|HTTP 500|500 Internal Server Error"; then
-              echo "🔁 Retryable: **$CLASS.$METHOD**" >> $GITHUB_STEP_SUMMARY
-
+            if echo "$MESSAGE" | grep -Ei "timeout|HTTP 500|500 Internal Server Error" > /dev/null; then
+              RETRY_COUNT=$((RETRY_COUNT+1))
               echo "      <class name=\"$CLASS\">" >> $RETRY_SUITE
               echo "        <methods>" >> $RETRY_SUITE
               echo "          <include name=\"$METHOD\"/>" >> $RETRY_SUITE
               echo "        </methods>" >> $RETRY_SUITE
               echo "      </class>" >> $RETRY_SUITE
-
-              RETRY_COUNT=$((RETRY_COUNT+1))
-            else
-              echo "⛔ Not retrying: **$CLASS.$METHOD** (Assertion)" >> $GITHUB_STEP_SUMMARY
             fi
           done
 
@@ -70,27 +59,60 @@ jobs:
           echo "</suite>" >> $RETRY_SUITE
 
           if [ "$RETRY_COUNT" -gt 0 ]; then
-            echo "" >> $GITHUB_STEP_SUMMARY
-            echo "🔁 Retry-eligible tests: **$RETRY_COUNT**" >> $GITHUB_STEP_SUMMARY
             echo "retry=true" >> $GITHUB_OUTPUT
           else
-            echo "⚠️ No retry-eligible failures found" >> $GITHUB_STEP_SUMMARY
             echo "retry=false" >> $GITHUB_OUTPUT
           fi
 
-      # Rerun retry-eligible tests only
-      - name: Rerun retry-eligible tests
+      # 5️⃣ Rerun retryable failures only
+      - name: Rerun retryable failures
         if: steps.analyse.outputs.retry == 'true'
+        id: rerun
         run: mvn test -DsuiteXmlFile=test-output/retry-suite.xml
         continue-on-error: true
 
-      # Final Result
-      - name: Final status
+      # 6️⃣ Final Test Summary (Markdown Table)
+      - name: Final Test Summary
         if: always()
         run: |
-          if [ -f test-output/testng-failed.xml ]; then
-            echo "❌ Retryable tests still failing after rerun" >> $GITHUB_STEP_SUMMARY
+          RESULTS="test-output/testng-results.xml"
+          RETRY_FAILED="test-output/testng-failed.xml"
+
+          echo "### 🧪 Final Test Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          # Table header
+          echo "| Test | Initial Result | Retryable | Rerun Result |" >> $GITHUB_STEP_SUMMARY
+          echo "|------|----------------|-----------|--------------|" >> $GITHUB_STEP_SUMMARY
+
+          # Iterate over failed tests
+          grep '<test-method status="FAIL"' $RESULTS | while read -r line; do
+            CLASS=$(echo "$line" | sed -n 's/.*class="\([^"]*\)".*/\1/p')
+            METHOD=$(echo "$line" | sed -n 's/.*name="\([^"]*\)".*/\1/p')
+            MESSAGE=$(echo "$line" | sed -n 's/.*>\(.*\)<\/exception>.*/\1/p')
+
+            # Determine retryable & rerun result
+            if echo "$MESSAGE" | grep -Ei "timeout|HTTP 500|500 Internal Server Error" > /dev/null; then
+              RETRY="Yes"
+              if [ -f "$RETRY_FAILED" ] && grep -q "$METHOD" "$RETRY_FAILED"; then
+                RERUN_RESULT="Fail"
+              else
+                RERUN_RESULT="Pass"
+              fi
+            else
+              RETRY="No"
+              RERUN_RESULT="N/A"
+            fi
+
+            echo "| $CLASS.$METHOD | Fail | $RETRY | $RERUN_RESULT |" >> $GITHUB_STEP_SUMMARY
+          done
+
+          # Overall verdict
+          if [ -f "$RETRY_FAILED" ]; then
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "❌ Some retryable tests still failing after rerun" >> $GITHUB_STEP_SUMMARY
             exit 1
           else
+            echo "" >> $GITHUB_STEP_SUMMARY
             echo "✅ All retryable failures passed after rerun" >> $GITHUB_STEP_SUMMARY
           fi
