@@ -1,4 +1,4 @@
-name: Rerun Common Failures
+name: Smart Rerun – Timeout & 500 Only (SampleTest)
 
 on:
   workflow_dispatch:
@@ -39,7 +39,9 @@ jobs:
           echo "    <classes>" >> $RETRY_SUITE
 
           RETRY_COUNT=0
-          grep '<test-method status="FAIL"' $RESULTS | while read -r line; do
+
+          # Avoid subshell by using process substitution
+          while read -r line; do
             CLASS=$(echo "$line" | sed -n 's/.*class="\([^"]*\)".*/\1/p')
             METHOD=$(echo "$line" | sed -n 's/.*name="\([^"]*\)".*/\1/p')
             MESSAGE=$(echo "$line" | sed -n 's/.*>\(.*\)<\/exception>.*/\1/p')
@@ -52,7 +54,7 @@ jobs:
               echo "        </methods>" >> $RETRY_SUITE
               echo "      </class>" >> $RETRY_SUITE
             fi
-          done
+          done < <(grep '<test-method status="FAIL"' "$RESULTS")
 
           echo "    </classes>" >> $RETRY_SUITE
           echo "  </test>" >> $RETRY_SUITE
@@ -85,13 +87,12 @@ jobs:
           echo "| Test | Initial Result | Retryable | Rerun Result |" >> $GITHUB_STEP_SUMMARY
           echo "|------|----------------|-----------|--------------|" >> $GITHUB_STEP_SUMMARY
 
-          # Iterate over failed tests
-          grep '<test-method status="FAIL"' $RESULTS | while read -r line; do
+          # Loop over failed tests (process substitution to avoid subshell)
+          while read -r line; do
             CLASS=$(echo "$line" | sed -n 's/.*class="\([^"]*\)".*/\1/p')
             METHOD=$(echo "$line" | sed -n 's/.*name="\([^"]*\)".*/\1/p')
             MESSAGE=$(echo "$line" | sed -n 's/.*>\(.*\)<\/exception>.*/\1/p')
 
-            # Determine retryable & rerun result
             if echo "$MESSAGE" | grep -Ei "timeout|HTTP 500|500 Internal Server Error" > /dev/null; then
               RETRY="Yes"
               if [ -f "$RETRY_FAILED" ] && grep -q "$METHOD" "$RETRY_FAILED"; then
@@ -105,7 +106,7 @@ jobs:
             fi
 
             echo "| $CLASS.$METHOD | Fail | $RETRY | $RERUN_RESULT |" >> $GITHUB_STEP_SUMMARY
-          done
+          done < <(grep '<test-method status="FAIL"' "$RESULTS")
 
           # Overall verdict
           if [ -f "$RETRY_FAILED" ]; then
