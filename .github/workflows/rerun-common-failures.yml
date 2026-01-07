@@ -86,7 +86,7 @@ jobs:
 
       # Final Result
       - name: Final status
-        if: steps.analyse.outputs.retry == 'true'
+        if: always()
         run: |
           if [ -f test-output/testng-failed.xml ]; then
             echo "❌ Retryable tests still failing after rerun" >> $GITHUB_STEP_SUMMARY
