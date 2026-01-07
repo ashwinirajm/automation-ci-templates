@@ -27,17 +27,21 @@ jobs:
         run: mvn test -Denv=qa -Dsuite=smoke
         continue-on-error: true
 
-      # 4️⃣ Analyze failures & build retry suite
+      # 4️⃣ Debug: list TestNG output (optional)
+      - name: List TestNG results
+        run: ls -R target/surefire-reports
+
+      # 5️⃣ Analyze failures & build retry suite
       - name: Analyze failures
         id: analyse
         run: |
-          RESULTS="test-output/testng-results.xml"
+          # Correct path for Maven + TestNG
+          RESULTS="target/surefire-reports/testng-results.xml"
           RETRY_SUITE="test-output/retry-suite.xml"
 
-          # Ensure test-output folder exists
+          # Ensure folder exists
           mkdir -p test-output
 
-          # Start building retry suite
           echo "<suite name=\"Retry Suite\">" > $RETRY_SUITE
           echo "  <test name=\"Retry Timeout & 500\">" >> $RETRY_SUITE
           echo "    <classes>" >> $RETRY_SUITE
@@ -71,19 +75,19 @@ jobs:
             echo "retry=false" >> $GITHUB_OUTPUT
           fi
 
-      # 5️⃣ Rerun retryable failures only
+      # 6️⃣ Rerun retryable failures only
       - name: Rerun retryable failures
         if: steps.analyse.outputs.retry == 'true'
         id: rerun
         run: mvn test -DsuiteXmlFile=test-output/retry-suite.xml
         continue-on-error: true
 
-      # 6️⃣ Final Test Summary (Markdown Table)
+      # 7️⃣ Final Test Summary (Markdown Table)
       - name: Final Test Summary
         if: always()
         run: |
-          RESULTS="test-output/testng-results.xml"
-          RETRY_FAILED="test-output/testng-failed.xml"
+          RESULTS="target/surefire-reports/testng-results.xml"
+          RETRY_FAILED="target/surefire-reports/testng-failed.xml"
 
           echo "### 🧪 Final Test Summary" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
@@ -113,7 +117,7 @@ jobs:
             TABLE="$TABLE| $CLASS.$METHOD | Fail | $RETRY | $RERUN_RESULT |\n"
           done < <(grep '<test-method status="FAIL"' "$RESULTS")
 
-          # Append full table at once
+          # Append full table
           echo -e "$TABLE" >> $GITHUB_STEP_SUMMARY
 
           # Overall verdict
@@ -124,4 +128,3 @@ jobs:
           else
             echo "" >> $GITHUB_STEP_SUMMARY
             echo "✅ All retryable failures passed after rerun" >> $GITHUB_STEP_SUMMARY
-          fi
