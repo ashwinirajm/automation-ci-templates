@@ -81,7 +81,7 @@ jobs:
         run: mvn test -DsuiteXmlFile=test-output/retry-suite.xml
         continue-on-error: true
 
-      # 7️⃣ Final Test Summary (Markdown Table, syntax-safe)
+      # 7️⃣ Final Test Summary (syntax-safe using Bash array)
       - name: Final Test Summary
         if: always()
         run: |
@@ -95,8 +95,10 @@ jobs:
           TABLE="| Test | Initial Result | Retryable | Rerun Result |\n"
           TABLE="$TABLE|------|----------------|-----------|--------------|\n"
 
-          # Collect all failed tests safely
-          grep '<test-method status="FAIL"' "$RESULTS" | while read -r line; do
+          # Read failed test lines into an array
+          mapfile -t FAILED_LINES < <(grep '<test-method status="FAIL"' "$RESULTS")
+
+          for line in "${FAILED_LINES[@]}"; do
             CLASS=$(echo "$line" | sed -n 's/.*class="\([^"]*\)".*/\1/p')
             METHOD=$(echo "$line" | sed -n 's/.*name="\([^"]*\)".*/\1/p')
             MESSAGE=$(echo "$line" | sed -n 's/.*>\(.*\)<\/exception>.*/\1/p')
@@ -116,7 +118,7 @@ jobs:
             TABLE="${TABLE}| ${CLASS}.${METHOD} | Fail | ${RETRY} | ${RERUN_RESULT} |\n"
           done
 
-          # Append the table once
+          # Append full table
           echo -e "$TABLE" >> $GITHUB_STEP_SUMMARY
 
           # Overall verdict
