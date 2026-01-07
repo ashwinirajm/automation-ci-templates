@@ -82,4 +82,4 @@ jobs:
       # 7️⃣ Final Test Summary (call self-executable script)
       - name: Final Test Summary
         if: always()
-        run: bash ci/final-summary.sh
+        run: bash final-summary.sh
