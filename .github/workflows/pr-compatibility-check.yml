@@ -1,0 +1,48 @@
+name: PR Compatibility Check
+
+on:
+  pull_request:
+    branches:
+      - main
+      - develop
+
+jobs:
+  sanity-check:
+    name: Basic Build & Compatibility
+    runs-on: ubuntu-latest
+
+    steps:
+      # 1️⃣ Checkout code
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # 2️⃣ Set up Java (change version if needed)
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      # 3️⃣ Cache Maven dependencies
+      - name: Cache Maven dependencies
+        uses: actions/cache@v4
+        with:
+          path: ~/.m2
+          key: maven-${{ runner.os }}-${{ hashFiles('**/pom.xml') }}
+          restore-keys: |
+            maven-${{ runner.os }}
+
+      # 4️⃣ Validate Maven project structure
+      - name: Validate Maven project
+        run: mvn validate
+
+      # 5️⃣ Compile code (no tests)
+      - name: Compile project
+        run: mvn clean compile -DskipTests
+
+      # 6️⃣ Optional: Lint YAML / configs
+      - name: Check YAML formatting
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y yamllint
+          yamllint . || true
