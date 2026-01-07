@@ -38,7 +38,6 @@ jobs:
           RESULTS="target/surefire-reports/testng-results.xml"
           RETRY_SUITE="test-output/retry-suite.xml"
 
-          # Ensure folder exists
           mkdir -p test-output
 
           echo "<suite name=\"Retry Suite\">" > $RETRY_SUITE
@@ -47,10 +46,9 @@ jobs:
 
           RETRY_COUNT=0
 
-          # Read failed tests
-          mapfile -t FAILED_LINES <<< "$(grep '<test-method status="FAIL"' "$RESULTS" || true)"
+          grep '<test-method status="FAIL"' "$RESULTS" > /tmp/failed_lines.txt || true
 
-          for line in "${FAILED_LINES[@]}"; do
+          while IFS= read -r line; do
             CLASS=$(echo "$line" | sed -n 's/.*class="\([^"]*\)".*/\1/p')
             METHOD=$(echo "$line" | sed -n 's/.*name="\([^"]*\)".*/\1/p')
             MESSAGE=$(echo "$line" | sed -n 's/.*>\(.*\)<\/exception>.*/\1/p')
@@ -63,72 +61,25 @@ jobs:
               echo "        </methods>" >> $RETRY_SUITE
               echo "      </class>" >> $RETRY_SUITE
             fi
-          done
+          done < /tmp/failed_lines.txt
 
           echo "    </classes>" >> $RETRY_SUITE
           echo "  </test>" >> $RETRY_SUITE
           echo "</suite>" >> $RETRY_SUITE
 
-          # Set output
           if [ "$RETRY_COUNT" -gt 0 ]; then
             echo "retry=true" >> $GITHUB_OUTPUT
           else
             echo "retry=false" >> $GITHUB_OUTPUT
           fi
 
-      # 6️⃣ Rerun retryable failures only
+      # 6️⃣ Rerun retryable failures
       - name: Rerun retryable failures
         if: steps.analyse.outputs.retry == 'true'
-        id: rerun
         run: mvn test -DsuiteXmlFile=test-output/retry-suite.xml
         continue-on-error: true
 
-      # 7️⃣ Final Test Summary (fully syntax-safe)
+      # 7️⃣ Final Test Summary (call self-executable script)
       - name: Final Test Summary
         if: always()
-        shell: bash
-        run: |
-          RESULTS="target/surefire-reports/testng-results.xml"
-          RETRY_FAILED="target/surefire-reports/testng-failed.xml"
-
-          echo "### 🧪 Final Test Summary" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-
-          # Table header
-          TABLE="| Test | Initial Result | Retryable | Rerun Result |\n"
-          TABLE="$TABLE|------|----------------|-----------|--------------|\n"
-
-          # Read failed test lines into a Bash array
-          mapfile -t FAILED_LINES <<< "$(grep '<test-method status="FAIL"' "$RESULTS" || true)"
-
-          for line in "${FAILED_LINES[@]}"; do
-            CLASS=$(echo "$line" | sed -n 's/.*class="\([^"]*\)".*/\1/p')
-            METHOD=$(echo "$line" | sed -n 's/.*name="\([^"]*\)".*/\1/p')
-            MESSAGE=$(echo "$line" | sed -n 's/.*>\(.*\)<\/exception>.*/\1/p')
-
-            if echo "$MESSAGE" | grep -Ei "timeout|HTTP 500|500 Internal Server Error" > /dev/null; then
-              RETRY="Yes"
-              if [ -f "$RETRY_FAILED" ] && grep -q "$METHOD" "$RETRY_FAILED"; then
-                RERUN_RESULT="Fail"
-              else
-                RERUN_RESULT="Pass"
-              fi
-            else
-              RETRY="No"
-              RERUN_RESULT="N/A"
-            fi
-
-            TABLE="${TABLE}| ${CLASS}.${METHOD} | Fail | ${RETRY} | ${RERUN_RESULT} |\n"
-          done
-
-          # Append the table to summary
-          echo -e "$TABLE" >> $GITHUB_STEP_SUMMARY
-
-          # Overall verdict
-          if [ -f "$RETRY_FAILED" ]; then
-            echo "" >> $GITHUB_STEP_SUMMARY
-            echo "❌ Some retryable tests still failing after rerun" >> $GITHUB_STEP_SUMMARY
-            exit 1
-          else
-            echo "" >> $GITHUB_STEP_SUMMARY
-            echo "✅ All retryable failures passed after rerun" >> $GITHUB_STEP_SUMMARY
+        run: bash ci/final-summary.sh
