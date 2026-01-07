@@ -1,4 +1,4 @@
-name: Env + Suite Tests with Failure Signature Analysis
+name: Test Execution with Failure Analysis
 
 on:
   workflow_dispatch:
