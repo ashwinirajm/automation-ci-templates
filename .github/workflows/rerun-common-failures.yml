@@ -47,8 +47,9 @@ jobs:
 
           RETRY_COUNT=0
 
-          # Collect retryable failed tests safely
-          grep '<test-method status="FAIL"' "$RESULTS" | while read -r line; do
+          # Collect retryable failed tests
+          grep '<test-method status="FAIL"' "$RESULTS" > /tmp/failed_lines.txt || true
+          while IFS= read -r line; do
             CLASS=$(echo "$line" | sed -n 's/.*class="\([^"]*\)".*/\1/p')
             METHOD=$(echo "$line" | sed -n 's/.*name="\([^"]*\)".*/\1/p')
             MESSAGE=$(echo "$line" | sed -n 's/.*>\(.*\)<\/exception>.*/\1/p')
@@ -61,13 +62,12 @@ jobs:
               echo "        </methods>" >> $RETRY_SUITE
               echo "      </class>" >> $RETRY_SUITE
             fi
-          done
+          done < /tmp/failed_lines.txt
 
           echo "    </classes>" >> $RETRY_SUITE
           echo "  </test>" >> $RETRY_SUITE
           echo "</suite>" >> $RETRY_SUITE
 
-          # Output retry decision
           if [ "$RETRY_COUNT" -gt 0 ]; then
             echo "retry=true" >> $GITHUB_OUTPUT
           else
@@ -81,9 +81,10 @@ jobs:
         run: mvn test -DsuiteXmlFile=test-output/retry-suite.xml
         continue-on-error: true
 
-      # 7️⃣ Final Test Summary (syntax-safe using Bash array)
+      # 7️⃣ Final Test Summary (syntax-safe using temp file)
       - name: Final Test Summary
         if: always()
+        shell: bash
         run: |
           RESULTS="target/surefire-reports/testng-results.xml"
           RETRY_FAILED="target/surefire-reports/testng-failed.xml"
@@ -95,10 +96,10 @@ jobs:
           TABLE="| Test | Initial Result | Retryable | Rerun Result |\n"
           TABLE="$TABLE|------|----------------|-----------|--------------|\n"
 
-          # Read failed test lines into an array
-          mapfile -t FAILED_LINES < <(grep '<test-method status="FAIL"' "$RESULTS")
+          # Read all failed test lines safely into a temp file
+          grep '<test-method status="FAIL"' "$RESULTS" > /tmp/failed_lines.txt || true
 
-          for line in "${FAILED_LINES[@]}"; do
+          while IFS= read -r line; do
             CLASS=$(echo "$line" | sed -n 's/.*class="\([^"]*\)".*/\1/p')
             METHOD=$(echo "$line" | sed -n 's/.*name="\([^"]*\)".*/\1/p')
             MESSAGE=$(echo "$line" | sed -n 's/.*>\(.*\)<\/exception>.*/\1/p')
@@ -116,7 +117,7 @@ jobs:
             fi
 
             TABLE="${TABLE}| ${CLASS}.${METHOD} | Fail | ${RETRY} | ${RERUN_RESULT} |\n"
-          done
+          done < /tmp/failed_lines.txt
 
           # Append full table
           echo -e "$TABLE" >> $GITHUB_STEP_SUMMARY
