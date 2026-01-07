@@ -10,11 +10,11 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # 1️⃣ Checkout
+      # 1️⃣ Checkout code
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # 2️⃣ Java setup
+      # 2️⃣ Set up Java
       - name: Set up Java
         uses: actions/setup-java@v4
         with:
@@ -27,11 +27,13 @@ jobs:
         run: mvn test -Denv=qa -Dsuite=smoke
         continue-on-error: true
 
-      # 4️⃣ Debug: list TestNG output (optional)
-      - name: List TestNG results
-        run: ls -R target/surefire-reports
+      # 4️⃣ Debug TestNG results (optional, can remove later)
+      - name: List TestNG reports
+        run: |
+          ls -R target/surefire-reports
+          head -20 target/surefire-reports/testng-results.xml || true
 
-      # 5️⃣ Analyze failures & build retry suite
+      # 5️⃣ Analyze failures and build retry suite
       - name: Analyze failures
         id: analyse
         run: |
@@ -46,11 +48,18 @@ jobs:
 
           RETRY_COUNT=0
 
-          grep '<test-method status="FAIL"' "$RESULTS" > /tmp/failed_lines.txt || true
+          # Capture all failed tests from initial run
+          grep -E '<test-method status="FAIL"|<testcase.*failure' "$RESULTS" > /tmp/failed_lines.txt || true
 
           while IFS= read -r line; do
             CLASS=$(echo "$line" | sed -n 's/.*class="\([^"]*\)".*/\1/p')
             METHOD=$(echo "$line" | sed -n 's/.*name="\([^"]*\)".*/\1/p')
+            if [ -z "$CLASS" ]; then
+              CLASS=$(echo "$line" | sed -n 's/.*classname="\([^"]*\)".*/\1/p')
+            fi
+            if [ -z "$METHOD" ]; then
+              METHOD=$(echo "$line" | sed -n 's/.*name="\([^"]*\)".*/\1/p')
+            fi
             MESSAGE=$(echo "$line" | sed -n 's/.*>\(.*\)<\/exception>.*/\1/p')
 
             if echo "$MESSAGE" | grep -Ei "timeout|HTTP 500|500 Internal Server Error" > /dev/null; then
@@ -73,13 +82,13 @@ jobs:
             echo "retry=false" >> $GITHUB_OUTPUT
           fi
 
-      # 6️⃣ Rerun retryable failures
+      # 6️⃣ Rerun retryable failures only
       - name: Rerun retryable failures
         if: steps.analyse.outputs.retry == 'true'
         run: mvn test -DsuiteXmlFile=test-output/retry-suite.xml
         continue-on-error: true
 
-      # 7️⃣ Final Test Summary (call self-executable script)
+      # 7️⃣ Final Test Summary (shows all failed tests, retryable, rerun result)
       - name: Final Test Summary
         if: always()
         run: bash scripts/final-summary.sh
