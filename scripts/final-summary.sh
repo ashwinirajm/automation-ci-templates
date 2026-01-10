@@ -1,56 +1,85 @@
 #!/bin/bash
 set -e
 
+# ----------------------------
+# File locations
+# ----------------------------
 INITIAL="test-output/testng-results-initial.xml"
 RERUN="target/surefire-reports/testng-results.xml"
 SUMMARY="$GITHUB_STEP_SUMMARY"
 
+# ----------------------------
+# Header
+# ----------------------------
 echo "### 🧪 Final Test Summary" >> "$SUMMARY"
 echo "" >> "$SUMMARY"
 echo "| Test | Initial Result | Retryable | Rerun Result |" >> "$SUMMARY"
 echo "|------|----------------|-----------|--------------|" >> "$SUMMARY"
 
-# Safety
+# ----------------------------
+# Safety checks
+# ----------------------------
 if [ ! -f "$INITIAL" ]; then
   echo "| Initial results missing | ❌ | N/A | N/A |" >> "$SUMMARY"
   exit 1
 fi
 
-# Extract failed tests from INITIAL run
-mapfile -t FAILED < <(grep 'status="FAIL"' "$INITIAL")
+# ----------------------------
+# Collect failed tests from INITIAL run
+# ----------------------------
+mapfile -t FAILED_TESTS < <(grep 'status="FAIL"' "$INITIAL" || true)
 
-if [ ${#FAILED[@]} -eq 0 ]; then
+# ----------------------------
+# No failures at all
+# ----------------------------
+if [ ${#FAILED_TESTS[@]} -eq 0 ]; then
   echo "| All tests passed | Pass | N/A | N/A |" >> "$SUMMARY"
   echo "" >> "$SUMMARY"
   echo "✅ All tests passed in initial run" >> "$SUMMARY"
   exit 0
 fi
 
-for line in "${FAILED[@]}"; do
+# ----------------------------
+# Process each failed test
+# ----------------------------
+for line in "${FAILED_TESTS[@]}"; do
   CLASS=$(echo "$line" | sed -n 's/.*class="\([^"]*\)".*/\1/p')
   METHOD=$(echo "$line" | sed -n 's/.*name="\([^"]*\)".*/\1/p')
 
-  MESSAGE=$(grep -A3 "$METHOD" "$INITIAL" | grep '<message>' | head -1 | sed 's/.*<message>\(.*\)<\/message>.*/\1/')
+  # Extract failure message reliably
+  MESSAGE=$(awk -v method="$METHOD" '
+    $0 ~ "<test-method" && $0 ~ "name=\""method"\"" {in_block=1}
+    in_block && /<message>/ {
+      gsub(/.*<message>|<\/message>.*/, "", $0)
+      print
+      exit
+    }
+    in_block && /<\/test-method>/ {in_block=0}
+  ' "$INITIAL")
 
-  if echo "$MESSAGE" | grep -Ei "timeout|HTTP 500|500 Internal Server Error" > /dev/null; then
-    RETRY="Yes"
-    if grep -q "$METHOD" "$RERUN"; then
+  # Determine retry eligibility
+  if echo "$MESSAGE" | grep -Ei "timeout|HTTP 500|500 Internal Server Error" >/dev/null; then
+    RETRYABLE="Yes"
+
+    if [ -f "$RERUN" ] && grep -q "name=\"$METHOD\"" "$RERUN"; then
       RERUN_RESULT="Fail"
     else
       RERUN_RESULT="Pass"
     fi
   else
-    RETRY="No"
+    RETRYABLE="No"
     RERUN_RESULT="N/A"
   fi
 
-  echo "| ${CLASS}.${METHOD} | Fail | $RETRY | $RERUN_RESULT |" >> "$SUMMARY"
+  echo "| ${CLASS}.${METHOD} | Fail | ${RETRYABLE} | ${RERUN_RESULT} |" >> "$SUMMARY"
 done
 
+# ----------------------------
+# Final verdict
+# ----------------------------
 echo "" >> "$SUMMARY"
 
-# Final verdict
-if grep -q 'status="FAIL"' "$RERUN"; then
+if [ -f "$RERUN" ] && grep -q 'status="FAIL"' "$RERUN"; then
   echo "❌ Some retryable tests still failing after rerun" >> "$SUMMARY"
   exit 1
 else
