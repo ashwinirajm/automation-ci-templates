@@ -13,4 +13,6 @@ This repo provides reusable GitHub Actions CI templates designed to simplify and
   
 - [test-execution-with-failure-analysis.yml](.github/workflows/test-execution-with-failure-analysis.yml) - Supports environment- and suite-based execution, automatically categorizes failures (TIMEOUT, SERVER_500, ASSERTION_FAILURE, UNKNOWN_FAILURE), and tracks occurrence counts for each failure type.
 
-- [scheduled-mobile-tests.yml](.github/workflows/scheduled-mobile-tests.yml) Supports Android and iOS test execution on self-hosted macOS runners, uploads test reports as artifacts, triggers manually or on a weekly schedule, and allows configurable environment, thread count, and suite XML.
+- [scheduled-mobile-tests.yml](.github/workflows/scheduled-mobile-tests.yml) - Supports Android and iOS test execution on self-hosted macOS runners, uploads test reports as artifacts, triggers manually or on a weekly schedule, and allows configurable environment, thread count, and suite XML.
+
+- [rerun-common-failures.yml](.github/workflows/rerun-common-failures.yml) - Analyzes test failures and selectively reruns those caused by common transient issues like timeouts, HTTP 500.
