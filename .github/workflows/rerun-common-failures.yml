@@ -1,5 +1,4 @@
-name: Smart Rerun – Timeout & 500 Only (SampleTest)
-
+name: TestNG Failure Analysis & Selective Rerun
 on:
   workflow_dispatch:
   push:
