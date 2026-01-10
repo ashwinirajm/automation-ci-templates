@@ -96,4 +96,4 @@ jobs:
       # 7️⃣ Final Test Summary (shows all failed tests, retryable, rerun result)
       - name: Final Test Summary
         if: always()
-        run: bash scripts/testng-renun-analysis.sh
+        run: bash scripts/testng-rerun-analysis.sh
