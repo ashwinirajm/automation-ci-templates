@@ -9,35 +9,36 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # 1️⃣ Checkout code
+      # Checkout code
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # 2️⃣ Set up Java
+      # Set up Java
       - name: Set up Java
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: 17
 
-      # 3️⃣ Run initial tests
+      # Run initial tests
       - name: Run tests (initial)
         id: initial
         run: mvn test -Denv=qa -Dsuite=smoke
         continue-on-error: true
-
+        
+      # Archive initial Results
       - name: Archive initial TestNG results
         run: |
               mkdir -p test-output
               cp target/surefire-reports/testng-results.xml test-output/testng-results-initial.xml  
 
-      # 4️⃣ Debug TestNG results (optional, can remove later)
+      # Debug TestNG results (optional, can remove later)
       - name: List TestNG reports
         run: |
           ls -R target/surefire-reports
           head -20 target/surefire-reports/testng-results.xml || true
 
-      # 5️⃣ Analyze failures and build retry suite
+      # Analyze failures and build retry suite
       - name: Analyze failures
         id: analyse
         run: |
@@ -95,4 +96,4 @@ jobs:
       # 7️⃣ Final Test Summary (shows all failed tests, retryable, rerun result)
       - name: Final Test Summary
         if: always()
-        run: bash scripts/final-summary.sh
+        run: bash scripts/testng-renun-analysis.sh
