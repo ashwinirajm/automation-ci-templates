@@ -27,6 +27,11 @@ jobs:
         run: mvn test -Denv=qa -Dsuite=smoke
         continue-on-error: true
 
+      - name: Archive initial TestNG results
+        run: |
+              mkdir -p test-output
+              cp target/surefire-reports/testng-results.xml test-output/testng-results-initial.xml  
+
       # 4️⃣ Debug TestNG results (optional, can remove later)
       - name: List TestNG reports
         run: |
