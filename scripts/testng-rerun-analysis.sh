@@ -32,11 +32,12 @@ for line in "${FAILED[@]}"; do
   if echo "$METHOD" | grep -Ei "timeout|500" >/dev/null; then
     RETRYABLE="Yes"
 
-    if [ -f "$RERUN" ] && grep -q "name=\"$METHOD\"" "$RERUN"; then
-      RERUN_RESULT="Fail"
-    else
-      RERUN_RESULT="Pass"
-    fi
+  if [ -f "$RERUN" ] && grep -q "status=\"FAIL\".*name=\"$METHOD\"" "$RERUN"; then
+    RERUN_RESULT="Fail"
+  else
+    RERUN_RESULT="Pass"
+  fi
+  
   else
     RETRYABLE="No"
     RERUN_RESULT="N/A"
